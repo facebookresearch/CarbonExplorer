@@ -1,4 +1,7 @@
-# Carbon Explorer
+<p align="center">
+  <img src="imgs/Carbon_Explorer_logo.png" width="1000">
+  <br />
+</p>
 
 _Carbon Explorer_ evaluates solutions make datacenters operate on renewable energy holistically by including embodied and operational footprints. Solutions _Carbon Explorer_ supports include:
 * Capacity sizing with a mix of solar and wind power

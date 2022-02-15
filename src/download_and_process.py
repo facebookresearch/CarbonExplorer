@@ -16,10 +16,8 @@ def downloadAndExtract(path):
     wget.download(url)
     
     # extract the data
-    EIA_bulk_data_dir = path + "/EBA"
-    
     with zipfile.ZipFile("EBA.zip","r") as zip_ref:
-        zip_ref.extractall(EIA_bulk_data_dir)
+        zip_ref.extractall(path)
 
 
 # Split json into multiple csv's for manual analysis, view

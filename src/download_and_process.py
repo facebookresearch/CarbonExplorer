@@ -139,3 +139,32 @@ def extractBARange(ba_idx, start_day, end_day):
     dfa = pd.DataFrame(np.array(ba_list).transpose(), columns=ng_list)
     dfa = dfa.set_index(idx)
     return dfa
+
+# Carbon intensity of the energy types, gCO2eq/kWh
+carbon_intensity = {
+    "WND": 11,
+    "SUN": 41,
+    "WAT": 24,
+    "OIL": 650,
+    "NG":  490,
+    "COL": 820,
+    "NUC": 12,
+    "OTH": 230,
+}
+
+# Calculate carbon intensity of the grid (kg CO2/MWh)
+# Takes a dataframe of energy generation as input (i.e. output of extractBARange)
+# Returns a time series of carbon intensity dataframe
+def calculateAVGCarbonIntensity(db):
+    tot_carbon = None
+    db[db < 0] = 0
+    sum_db = db.sum(axis=1)
+    for c in carbon_intensity:
+        if tot_carbon is None:
+            tot_carbon = carbon_intensity[c]*db[c]
+        else:
+            tot_carbon = tot_carbon + carbon_intensity[c]*db[c]
+    tot_carbon = tot_carbon.div(sum_db).to_frame()
+    tot_carbon.rename(columns={tot_carbon.columns[0]: "carbon_intensity"}, inplace=True)
+    return tot_carbon
+

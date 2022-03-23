@@ -207,13 +207,11 @@ def calculate_247_battery_capacity_b1_sim(df_ren, df_dc_pow, max_bsize):
 # dc operate on renewables 24/7
 def calculate_247_battery_capacity(df_ren, df_dc_pow):
     battery_cap = 0 # return value stored here, capacity needed
-    daily_net_load = 0 # for calculating infeasible cases
-    b = Battery(0) # start with an empty battery
+    b = Battery2(0) # start with an empty battery
 
     for i in range(df_dc_pow.shape[0]):
         ren_mw = df_ren[i]
         df_dc = df_dc_pow["avg_dc_power_mw"][i]
-        daily_net_load += ren_mw - df_dc
 
         if df_dc > ren_mw:  # if there's not enough renewable supply, need to discharge
             if(b.capacity == 0):
@@ -223,31 +221,18 @@ def calculate_247_battery_capacity(df_ren, df_dc_pow):
                 if(load_before == 0):
                     b.find_and_init_capacity(df_dc - ren_mw)
                 else:
-                    b.discharge(df_dc - ren_mw)
-                    load_after = b.current_load
-                    if(load_after == 0):
-                        b.find_and_init_capacity((df_dc - ren_mw) - load_before)
+                    drawn_amount = b.discharge(df_dc - ren_mw)
+                    if(drawn_amount < (df_dc - ren_mw)):
+                        b.find_and_init_capacity((df_dc - ren_mw) - drawn_amount)
         else:  # there's excess renewable supply, charge batteries
             if b.capacity > 0:
                 b.charge(ren_mw-df_dc)
             elif b.is_full():
-                b = Battery(0)
+                b = Battery2(0)
 
         if b.capacity > 0 and battery_cap != np.nan:
             battery_cap = max(battery_cap, b.capacity)
-            #print(i)
-            #print(battery_cap)
  
-        # daily check, battery impossible case
-        # if the battery cannot be filled fully in 3 days, assume it's infeasible
-        # return np.nan
-        if (i + 1) % 72 == 0:
-            if daily_net_load < 0:
-                battery_cap = np.nan
-                break
-            else:
-                daily_net_load = 0
-
     return battery_cap
 
 # Takes battery capacity, renewable supply and dc power as input dataframes

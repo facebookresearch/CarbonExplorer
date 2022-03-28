@@ -151,13 +151,15 @@ class Battery2:
 # return True if battery can meet all demand, False otherwise
 def sim_battery_247(df_ren, df_dc_pow, b):
 
-    points_per_hour = 60
+    points_per_hour = 6
+
 
     for i in range(df_dc_pow.shape[0]):
         ren_mw = df_ren[i]
         df_dc = df_dc_pow["avg_dc_power_mw"][i]
         net_load = ren_mw - df_dc
 
+        actual_discharge = 0
         # Apply the net power points_per_hour times
         for j in range(points_per_hour):
 
@@ -167,10 +169,11 @@ def sim_battery_247(df_ren, df_dc_pow, b):
 
             else:
                 # deficit, discharge
-                actual_discharge = b.discharge(-net_load, 1/points_per_hour)
+                actual_discharge += b.discharge(-net_load, 1/points_per_hour)
                 # if we couldnt discharge enough, exit
-                if actual_discharge < -net_load:
-                    return False
+        # check if actual dicharge was sufficient to meet net load (with some tolerance for imprecision)
+        if net_load < 0 and actual_discharge < -net_load - 0.0001:
+            return False
     return True
 
 

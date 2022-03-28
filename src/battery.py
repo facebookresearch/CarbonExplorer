@@ -123,8 +123,8 @@ class Battery2:
         max_discharge = self.calc_max_discharge(T_u)
         self.current_load = self.current_load - (min(max_discharge, output_load) * self.eff_d * T_u)
         if(max_discharge < output_load): # not enough battery load
-            return max_discharge
-        return output_load
+            return max_discharge*T_u
+        return output_load*T_u
 
     def is_full(self):
         return (self.capacity == self.current_load)
@@ -257,16 +257,19 @@ def apply_battery(battery_capacity, df_ren, df_dc_pow):
     b = Battery2(battery_capacity, battery_capacity)
     tot_non_ren_mw = 0 # store the mw amount battery cannot supply here
 
+    points_per_hour = 60
     for i in range(df_dc_pow.shape[0]):
         ren_mw = df_ren[i]
         df_dc = df_dc_pow["avg_dc_power_mw"][i]
         gap = df_dc - ren_mw
-        # lack or excess renewable supply
-        if gap > 0: #discharging from battery
-            discharged_amount = b.discharge(gap)
-            tot_non_ren_mw = tot_non_ren_mw + gap - discharged_amount
-        else: # charging the battery
-            b.charge(-gap)
-
+        discharged_amount = 0
+        for j in range(points_per_hour):
+            # lack or excess renewable supply
+            if gap > 0: #discharging from battery
+                discharged_amount += b.discharge(gap, 1/points_per_hour)
+            else: # charging the battery
+                b.charge(-gap, 1/points_per_hour)
+        if gap > 0:
+            tot_non_ren_mw += tot_non_ren_mw + gap - discharged_amount
     return tot_non_ren_mw
 

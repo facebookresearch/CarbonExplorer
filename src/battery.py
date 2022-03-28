@@ -151,7 +151,7 @@ class Battery2:
 # return True if battery can meet all demand, False otherwise
 def sim_battery_247(df_ren, df_dc_pow, b):
 
-    points_per_hour = 6
+    points_per_hour = 60
 
 
     for i in range(df_dc_pow.shape[0]):

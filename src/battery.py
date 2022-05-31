@@ -273,6 +273,6 @@ def apply_battery(battery_capacity, df_ren, df_dc_pow):
             else: # charging the battery
                 b.charge(-gap, 1/points_per_hour)
         if gap > 0:
-            tot_non_ren_mw += tot_non_ren_mw + gap - discharged_amount
+            tot_non_ren_mw = tot_non_ren_mw + gap - discharged_amount
     return tot_non_ren_mw
 

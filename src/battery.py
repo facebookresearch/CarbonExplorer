@@ -272,7 +272,9 @@ def apply_battery(battery_capacity, df_ren, df_dc_pow):
                 discharged_amount += b.discharge(gap, 1/points_per_hour)
             else: # charging the battery
                 b.charge(-gap, 1/points_per_hour)
+                df_ren[i] += gap * (1 / points_per_hour) # decrease the available renewable energy
         if gap > 0:
             tot_non_ren_mw = tot_non_ren_mw + gap - discharged_amount
-    return tot_non_ren_mw
+            df_ren[i] += discharged_amount  # increase the renewables available by the discharged
+    return tot_non_ren_mw, df_ren
 

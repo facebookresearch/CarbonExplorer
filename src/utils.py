@@ -19,3 +19,15 @@ def pareto_frontier(Xs, Ys, maxX=True, maxY= True):
     frontY = [pair[1] for pair in front_point]
     return frontX, frontY
 
+
+# Given renewable and dc power dataframes,
+# calculate renewable coverage percentage (%)
+def calculate_coverage(df_ren, df_dc):
+    non_ren_mw = 0
+    for i in range(df_ren.shape[0]):
+        if df_dc[i] > df_ren[i]:
+            non_ren_mw = non_ren_mw + df_dc[i] - df_ren[i]
+    sum_dc = df_dc.sum()
+    coverage = (sum_dc - non_ren_mw) / sum_dc * 100
+    # print("Renewable coverage ratio: ", coverage, "%")
+    return coverage

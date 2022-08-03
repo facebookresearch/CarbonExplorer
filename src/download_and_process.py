@@ -73,6 +73,7 @@ def prepareEIAData(EIA_data_path):
     return eba_json, ba_list, ts_list
 
 
+# Energy types
 ng_list = [
     "WND", # wind
     "SUN", # solar
@@ -83,6 +84,21 @@ ng_list = [
     "NUC", # nuclear
     "OTH", # other
 ]
+
+# Renewable energy types
+rn_list = ["WND", "SUN", "WAT"]
+
+# Carbon intensity of the energy types, gCO2eq/kWh
+carbon_intensity = {
+    "WND": 11,
+    "SUN": 41,
+    "WAT": 24,
+    "OIL": 650,
+    "NG":  490,
+    "COL": 820,
+    "NUC": 12,
+    "OTH": 230,
+}
 
 # Construct dataframe from json
 # Target specific balancing authority and day
@@ -139,18 +155,6 @@ def extractBARange(ba_idx, start_day, end_day):
     dfa = pd.DataFrame(np.array(ba_list).transpose(), columns=ng_list)
     dfa = dfa.set_index(idx)
     return dfa
-
-# Carbon intensity of the energy types, gCO2eq/kWh
-carbon_intensity = {
-    "WND": 11,
-    "SUN": 41,
-    "WAT": 24,
-    "OIL": 650,
-    "NG":  490,
-    "COL": 820,
-    "NUC": 12,
-    "OTH": 230,
-}
 
 # Calculate carbon intensity of the grid (kg CO2/MWh)
 # Takes a dataframe of energy generation as input (i.e. output of extractBARange)

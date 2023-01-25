@@ -23,7 +23,7 @@ Carbon Explorer is accepted at [ASPLOS'23](https://asplos-conference.org/). Plea
 ``` bibtex
 @article{acun2022holistic,
   title={Carbon Explorer: A Holistic Approach for Designing Carbon Aware Datacenters},
-  author={Acun, Bilge and Lee, Benjamin and Maeng, Kiwan and Chakkaravarthy, Manoj and Gupta, Udit and Brooks, David and Wu, Carole-Jean},
+  author={Acun, Bilge and Lee, Benjamin and Kazhamiaka, Fiodar and Maeng, Kiwan and Chakkaravarthy, Manoj and Gupta, Udit and Brooks, David and Wu, Carole-Jean},
   journal={Proceedings of the 28th ACM International Conference on Architectural Support for Programming Languages and Operating Systems},
   year={2023}
 }

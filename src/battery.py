@@ -155,8 +155,8 @@ def sim_battery_247(df_ren, df_dc_pow, b):
 
 
     for i in range(df_dc_pow.shape[0]):
-        ren_mw = df_ren[i]
-        df_dc = df_dc_pow["avg_dc_power_mw"][i]
+        ren_mw = df_ren.iloc[i]
+        df_dc = df_dc_pow["avg_dc_power_mw"].iloc[i]
         net_load = ren_mw - df_dc
 
         actual_discharge = 0
@@ -228,8 +228,8 @@ def calculate_247_battery_capacity(df_ren, df_dc_pow):
     b = Battery(0) # start with an empty battery
 
     for i in range(df_dc_pow.shape[0]):
-        ren_mw = df_ren[i]
-        df_dc = df_dc_pow["avg_dc_power_mw"][i]
+        ren_mw = df_ren.iloc[i]
+        df_dc = df_dc_pow["avg_dc_power_mw"].iloc[i]
 
         if df_dc > ren_mw:  # if there's not enough renewable supply, need to discharge
             if(b.capacity == 0):
@@ -262,8 +262,8 @@ def apply_battery(battery_capacity, df_ren, df_dc_pow):
 
     points_per_hour = 60
     for i in range(df_dc_pow.shape[0]):
-        ren_mw = df_ren[i]
-        df_dc = df_dc_pow["avg_dc_power_mw"][i]
+        ren_mw = df_ren.iloc[i]
+        df_dc = df_dc_pow["avg_dc_power_mw"].iloc[i]
         gap = df_dc - ren_mw
         discharged_amount = 0
         for j in range(points_per_hour):
@@ -272,9 +272,9 @@ def apply_battery(battery_capacity, df_ren, df_dc_pow):
                 discharged_amount += b.discharge(gap, 1/points_per_hour)
             else: # charging the battery
                 b.charge(-gap, 1/points_per_hour)
-                df_ren[i] += gap * (1 / points_per_hour) # decrease the available renewable energy
+                df_ren.iloc[i] += gap * (1 / points_per_hour) # decrease the available renewable energy
         if gap > 0:
             tot_non_ren_mw = tot_non_ren_mw + gap - discharged_amount
-            df_ren[i] += discharged_amount  # increase the renewables available by the discharged
+            df_ren.iloc[i] += discharged_amount  # increase the renewables available by the discharged
     return tot_non_ren_mw, df_ren
 

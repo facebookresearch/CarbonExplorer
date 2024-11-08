@@ -17,6 +17,8 @@ The repository contains two notebooks:
 * [**EIA_Energy_Data_Analysis.ipynb**](https://github.com/facebookresearch/CarbonExplorer/blob/main/EIA_Energy_Data_Analysis.ipynb) analyses [EIA's hourly renewable energy data](https://www.eia.gov/opendata/bulkfiles.php).
 * [**Carbon_Explorer.ipynb**](https://github.com/facebookresearch/CarbonExplorer/blob/main/Carbon_Explorer.ipynb) combines EIA's data with DC power simulations, evaluates the solutions listed above and finally produces embodied and operational footprint analysis.
 \
+Tested with Python 3.10 & pandas 2.1.1.
+\
 &nbsp;
 ## Citation
 Carbon Explorer is accepted at [ASPLOS'23](https://asplos-conference.org/). Please cite as:

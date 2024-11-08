@@ -8,6 +8,7 @@ import pandas as pd
 import math
 import re
 import numpy as np
+from pyarrow import json
 
 # Download EIA's U.S. Electric System Operating Data
 def downloadAndExtract(path):
@@ -47,8 +48,9 @@ def prepareEIAData(EIA_data_path):
 
     # EBA.txt includes time series for power generation from
     # each balancing authority in json format.
-    #
-    eba_json = pd.read_json("{0}/EBA.txt".format(EIA_data_path), lines=True)
+    read_options = json.ReadOptions(block_size=2048576)
+    table = json.read_json("{0}/EBA.txt".format(EIA_data_path), read_options=read_options)
+    eba_json = table.to_pandas()
     #writeCSV(eba_json)
 
     # Construct list of BAs (ba_list)
@@ -127,8 +129,8 @@ def extractBARange(ba_idx, start_day, end_day):
 
         # Check start/end dates for BA's json include target day
         #
-        start_dat = pd.Timestamp(this_json['start'].reset_index(drop=True)[0])
-        end_dat = pd.Timestamp(this_json['end'].reset_index(drop=True)[0])
+        start_dat = pd.Timestamp(this_json['start'].reset_index(drop=True)[0], tz='UTC')
+        end_dat = pd.Timestamp(this_json['end'].reset_index(drop=True)[0], tz='UTC')
         if (start_idx < start_dat):
             print('Indexed start ({0}) precedes {1} dataset range ({2})'.format(start_idx, ng_idx, start_dat))
             #continue
@@ -142,17 +144,18 @@ def extractBARange(ba_idx, start_day, end_day):
         #
         tuple_list = this_json['data'][0]
         tuple_filtered = list(filter(\
-            lambda x: (pd.Timestamp(x[0]) >= start_idx) & (pd.Timestamp(x[0]) <= end_idx), \
+            lambda x: (pd.Timestamp(x[0], tz='UTC') >= start_idx) & (pd.Timestamp(x[0], tz='UTC') <= end_idx), \
             tuple_list))
         df = pd.DataFrame(tuple_filtered, columns =['timestamp', 'power'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
         df = df.sort_values(by=['timestamp'], ascending=(True))
         df.set_index(pd.DatetimeIndex(df['timestamp']), inplace=True)
         df.drop(columns=['timestamp'], inplace=True)
         df = df.reindex(index=idx, fill_value=0).reset_index()
         ba_list.append(df['power'].tolist())
 
-    dfa = pd.DataFrame(np.array(ba_list).transpose(), columns=ng_list)
+    ba_list = pd.to_numeric(ba_list, errors='coerce')
+    dfa = pd.DataFrame(np.array(ba_list).transpose(), columns=ng_list).fillna(0).astype(int)
     dfa = dfa.set_index(idx)
     return dfa
 

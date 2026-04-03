@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carbon Explorer - Renewable Coverage Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js-gl3d-dist@2.35.2/plotly-gl3d.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        header {
+            background: linear-gradient(135deg, #1a472a 0%, #0d2818 100%);
+            padding: 24px 32px;
+            border-bottom: 1px solid #2a5a3a;
+        }
+        header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #4ade80;
+        }
+        header p {
+            color: #94a3b8;
+            margin-top: 4px;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .control-group {
+            background: #1a1d27;
+            border-radius: 12px;
+            padding: 16px 20px;
+            border: 1px solid #2a2d37;
+        }
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+        select, input[type="date"] {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #3a3d47;
+            background: #252830;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #3a3d47;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4ade80;
+            cursor: pointer;
+        }
+        .slider-value {
+            min-width: 80px;
+            text-align: right;
+            font-weight: 700;
+            font-size: 16px;
+            color: #4ade80;
+        }
+        .coverage-banner {
+            background: linear-gradient(135deg, #1a472a 0%, #1a3a4a 100%);
+            border-radius: 12px;
+            padding: 20px 28px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #2a5a3a;
+        }
+        .coverage-banner .label {
+            font-size: 14px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .coverage-banner .value {
+            font-size: 48px;
+            font-weight: 800;
+            color: #4ade80;
+        }
+        .coverage-banner .details {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .chart-card {
+            background: #1a1d27;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2d37;
+        }
+        .chart-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 350px;
+        }
+        #loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 60vh;
+            font-size: 18px;
+            color: #94a3b8;
+        }
+        #loading .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #3a3d47;
+            border-top-color: #4ade80;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #app { display: none; }
+        .note {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Carbon Explorer</h1>
+        <p>Interactive Renewable Coverage Analysis &mdash; based on EIA U.S. Electric System Operating Data</p>
+    </header>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        Loading EIA data...
+    </div>
+
+    <div id="app" class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label>Datacenter Region</label>
+                <select id="region">
+                    <option value="OR">Oregon (BPAT)</option>
+                    <option value="NC">North Carolina (DUK)</option>
+                    <option value="UT">Utah (PACE)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Date Range</label>
+                <div style="display:flex;gap:8px;">
+                    <input type="date" id="startDate" />
+                    <input type="date" id="endDate" />
+                </div>
+                <div class="note" id="dateRange"></div>
+            </div>
+            <div class="control-group">
+                <label>Wind Capacity</label>
+                <div class="slider-container">
+                    <input type="range" id="windSlider" min="0" max="1000" value="500" step="10" />
+                    <span class="slider-value" id="windValue">500 MW</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Solar Capacity</label>
+                <div class="slider-container">
+                    <input type="range" id="solarSlider" min="0" max="1000" value="0" step="10" />
+                    <span class="slider-value" id="solarValue">0 MW</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="coverage-banner">
+            <div>
+                <div class="label">Renewable Coverage</div>
+                <div class="value" id="coverageValue">--</div>
+            </div>
+            <div style="text-align:right;">
+                <div class="details">
+                    Total Capacity: <strong id="totalCap">--</strong> MW<br>
+                    Hours Analyzed: <strong id="hoursCount">--</strong><br>
+                    Avg DC Power: <strong id="avgDcPower">--</strong> MW
+                </div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <div class="chart-card">
+                <h3>Hourly Power &amp; Renewable Generation</h3>
+                <div class="chart-wrapper">
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Renewable Coverage Surface</h3>
+                <div class="chart-wrapper">
+                    <div id="surfaceChart" style="width:100%;height:100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ---- Data & State ----
+    let DATA = null;
+    let timeChart = null;
+    let surfaceInitialized = false;
+
+    // ---- Load Data ----
+    fetch('data/ba_data.json')
+        .then(r => r.json())
+        .then(d => {
+            DATA = d;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            initApp();
+        })
+        .catch(err => {
+            document.getElementById('loading').innerHTML =
+                '<span style="color:#f87171">Failed to load data. Run preprocess_data.py first.</span>';
+        });
+
+    // ---- Helpers ----
+    // Parse EIA timestamp "20210101T00" -> Date
+    function parseEIATimestamp(ts) {
+        const y = ts.slice(0, 4), m = ts.slice(4, 6), d = ts.slice(6, 8), h = ts.slice(9, 11);
+        return new Date(Date.UTC(+y, +m - 1, +d, +h));
+    }
+
+    // Port of utils.calculate_coverage
+    function calculateCoverage(renValues, dcValues) {
+        let nonRenMw = 0;
+        let sumDc = 0;
+        for (let i = 0; i < renValues.length; i++) {
+            sumDc += dcValues[i];
+            if (dcValues[i] > renValues[i]) {
+                nonRenMw += dcValues[i] - renValues[i];
+            }
+        }
+        if (sumDc === 0) return 0;
+        return (sumDc - nonRenMw) / sumDc * 100;
+    }
+
+    // Simulate DC power (mirrors extractDCRange from notebook)
+    function simulateDCPower(dcPowerMw, numHours) {
+        const swingPct = 5;
+        const result = new Float64Array(numHours);
+        for (let i = 0; i < numHours; i++) {
+            result[i] = (Math.sin(i / 4) * dcPowerMw * swingPct / 100) / 2 + dcPowerMw;
+        }
+        // Roll by 6 (shift peak to noon)
+        const rolled = new Float64Array(numHours);
+        for (let i = 0; i < numHours; i++) {
+            rolled[i] = result[(i - 6 + numHours) % numHours];
+        }
+        return rolled;
+    }
+
+    // Filter data to date range, returns { timestamps, wndValues, sunValues, dcValues }
+    function getFilteredData(region, startDate, endDate) {
+        const r = DATA.regions[region];
+        const start = startDate.getTime();
+        const end = endDate.getTime();
+
+        // Build aligned arrays using WND timestamps as reference (or SUN if no WND)
+        const refTimestamps = r.WND_timestamps.length > 0 ? r.WND_timestamps : r.SUN_timestamps;
+        const refValues = r.WND_timestamps.length > 0 ? r.WND_values : null;
+
+        // Index SUN data by timestamp string for quick lookup
+        const sunMap = new Map();
+        for (let i = 0; i < r.SUN_timestamps.length; i++) {
+            sunMap.set(r.SUN_timestamps[i], r.SUN_values[i]);
+        }
+        const wndMap = new Map();
+        for (let i = 0; i < r.WND_timestamps.length; i++) {
+            wndMap.set(r.WND_timestamps[i], r.WND_values[i]);
+        }
+
+        // Use union of all timestamps
+        const allTs = new Set([...r.WND_timestamps, ...r.SUN_timestamps]);
+        const sortedTs = [...allTs].sort();
+
+        const timestamps = [];
+        const wndValues = [];
+        const sunValues = [];
+
+        for (const ts of sortedTs) {
+            const d = parseEIATimestamp(ts);
+            if (d.getTime() >= start && d.getTime() <= end) {
+                timestamps.push(d);
+                wndValues.push(wndMap.get(ts) || 0);
+                sunValues.push(sunMap.get(ts) || 0);
+            }
+        }
+
+        const dcValues = simulateDCPower(r.dc_power_mw, timestamps.length);
+
+        return {
+            timestamps,
+            wndValues,
+            sunValues,
+            dcValues,
+            wndMaxCap: r.WND_max_cap,
+            sunMaxCap: r.SUN_max_cap,
+            dcPowerMw: r.dc_power_mw,
+        };
+    }
+
+    // ---- Chart Setup ----
+    function createTimeChart(ctx) {
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'DC Power Demand',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239,68,68,0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        order: 0,
+                    },
+                    {
+                        label: 'Wind Generation',
+                        data: [],
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34,197,94,0.3)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: 'origin',
+                        order: 2,
+                    },
+                    {
+                        label: 'Solar Generation',
+                        data: [],
+                        borderColor: '#eab308',
+                        backgroundColor: 'rgba(234,179,8,0.3)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: '-1',  // stack on top of wind
+                        order: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                interaction: { intersect: false, mode: 'index' },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'day', displayFormats: { day: 'MMM d' } },
+                        grid: { color: '#2a2d37' },
+                        ticks: { color: '#94a3b8', maxTicksLimit: 12 },
+                    },
+                    y: {
+                        title: { display: true, text: 'Energy (MWh)', color: '#94a3b8' },
+                        grid: { color: '#2a2d37' },
+                        ticks: { color: '#94a3b8' },
+                        beginAtZero: true,
+                    },
+                },
+                plugins: {
+                    legend: { labels: { color: '#e0e0e0' } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} MWh`
+                        }
+                    }
+                },
+            },
+        });
+    }
+
+    // ---- Sweep: compute coverage grid for 3D surface ----
+    // Returns { solarAxis, windAxis, coverageGrid } where coverageGrid[wi][si] = coverage %
+    function computeSweepGrid(filtered) {
+        const { wndValues, sunValues, dcValues, wndMaxCap, sunMaxCap } = filtered;
+        const maxWindRange = Math.max(400, wndMaxCap > 0 ? 800 : 0);
+        const maxSolRange = Math.max(400, sunMaxCap > 0 ? 800 : 0);
+        const windSteps = 25;
+        const solSteps = 25;
+        const windStep = maxWindRange / windSteps;
+        const solStep = maxSolRange / solSteps;
+
+        const solarAxis = [];
+        const windAxis = [];
+        for (let si = 0; si <= solSteps; si++) solarAxis.push(Math.round(si * solStep));
+        for (let wi = 0; wi <= windSteps; wi++) windAxis.push(Math.round(wi * windStep));
+
+        const coverageGrid = [];
+        for (let wi = 0; wi <= windSteps; wi++) {
+            const row = [];
+            const wc = wi * windStep;
+            for (let si = 0; si <= solSteps; si++) {
+                const sc = si * solStep;
+                const ren = new Float64Array(dcValues.length);
+                for (let i = 0; i < dcValues.length; i++) {
+                    let w = wndMaxCap > 0 ? (wndValues[i] / wndMaxCap) * wc : 0;
+                    let s = sunMaxCap > 0 ? (sunValues[i] / sunMaxCap) * sc : 0;
+                    ren[i] = w + s;
+                }
+                row.push(Math.min(100, calculateCoverage(ren, dcValues)));
+            }
+            coverageGrid.push(row);
+        }
+        return { solarAxis, windAxis, coverageGrid };
+    }
+
+    // ---- Update 3D surface chart ----
+    function updateSurfaceChart(filtered, windCap, solarCap) {
+        const { solarAxis, windAxis, coverageGrid } = computeSweepGrid(filtered);
+
+        const surfaceTrace = {
+            x: solarAxis,
+            y: windAxis,
+            z: coverageGrid,
+            type: 'surface',
+            reversescale: true,
+            colorscale: 'Greens',
+            cmin: 0,
+            cmax: 100,
+            colorbar: {
+                title: { text: 'Coverage %', font: { color: '#94a3b8', size: 12 } },
+                tickfont: { color: '#94a3b8' },
+            },
+            hovertemplate: 'Solar: %{x} MW<br>Wind: %{y} MW<br>Coverage: %{z:.1f}%<extra></extra>',
+        };
+
+        // Marker for current slider position
+        // Find nearest coverage value
+        const si = solarAxis.reduce((best, v, i) => Math.abs(v - solarCap) < Math.abs(solarAxis[best] - solarCap) ? i : best, 0);
+        const wi = windAxis.reduce((best, v, i) => Math.abs(v - windCap) < Math.abs(windAxis[best] - windCap) ? i : best, 0);
+        const currentCov = coverageGrid[wi][si];
+
+        const markerTrace = {
+            x: [solarCap],
+            y: [windCap],
+            z: [currentCov],
+            type: 'scatter3d',
+            mode: 'markers',
+            marker: { size: 6, color: '#f87171', symbol: 'diamond' },
+            name: 'Your Investment',
+            hovertemplate: 'Solar: %{x} MW<br>Wind: %{y} MW<br>Coverage: %{z:.1f}%<extra>Current</extra>',
+        };
+
+        const layout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            margin: { l: 0, r: 0, t: 0, b: 0 },
+            scene: {
+                xaxis: { title: { text: 'Solar (MW)', font: { color: '#94a3b8', size: 12 } }, color: '#94a3b8', gridcolor: '#2a2d37', zerolinecolor: '#3a3d47' },
+                yaxis: { title: { text: 'Wind (MW)', font: { color: '#94a3b8', size: 12 } }, color: '#94a3b8', gridcolor: '#2a2d37', zerolinecolor: '#3a3d47' },
+                zaxis: { title: { text: 'Coverage (%)', font: { color: '#94a3b8', size: 12 } }, color: '#94a3b8', gridcolor: '#2a2d37', zerolinecolor: '#3a3d47', range: [0, 100] },
+                bgcolor: 'rgba(0,0,0,0)',
+                camera: { eye: { x: 1.8, y: 1.8, z: 1.2 } },
+            },
+            showlegend: false,
+        };
+
+        if (!surfaceInitialized) {
+            Plotly.newPlot('surfaceChart', [surfaceTrace, markerTrace], layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['toImage', 'sendDataToCloud'],
+                displaylogo: false,
+            });
+            surfaceInitialized = true;
+        } else {
+            Plotly.react('surfaceChart', [surfaceTrace, markerTrace], layout);
+        }
+    }
+
+    // ---- Downsample for rendering ----
+    function downsample(arr, maxPoints) {
+        if (arr.length <= maxPoints) return arr;
+        const step = arr.length / maxPoints;
+        const result = [];
+        for (let i = 0; i < maxPoints; i++) {
+            result.push(arr[Math.floor(i * step)]);
+        }
+        return result;
+    }
+
+    // ---- Main Update ----
+    function update() {
+        const region = document.getElementById('region').value;
+        const startDate = new Date(document.getElementById('startDate').value + 'T00:00:00Z');
+        const endDate = new Date(document.getElementById('endDate').value + 'T23:59:59Z');
+        const windCap = +document.getElementById('windSlider').value;
+        const solarCap = +document.getElementById('solarSlider').value;
+
+        document.getElementById('windValue').textContent = windCap + ' MW';
+        document.getElementById('solarValue').textContent = solarCap + ' MW';
+        document.getElementById('totalCap').textContent = windCap + solarCap;
+
+        const filtered = getFilteredData(region, startDate, endDate);
+        const { timestamps, wndValues, sunValues, dcValues, wndMaxCap, sunMaxCap, dcPowerMw } = filtered;
+
+        if (timestamps.length === 0) {
+            document.getElementById('coverageValue').textContent = 'No data';
+            document.getElementById('hoursCount').textContent = '0';
+            return;
+        }
+
+        // Project renewable generation
+        const projWnd = new Float64Array(timestamps.length);
+        const projSun = new Float64Array(timestamps.length);
+        const projTotal = new Float64Array(timestamps.length);
+        for (let i = 0; i < timestamps.length; i++) {
+            projWnd[i] = wndMaxCap > 0 ? (wndValues[i] / wndMaxCap) * windCap : 0;
+            projSun[i] = sunMaxCap > 0 ? (sunValues[i] / sunMaxCap) * solarCap : 0;
+            projTotal[i] = projWnd[i] + projSun[i];
+        }
+
+        const coverage = calculateCoverage(projTotal, dcValues);
+        document.getElementById('coverageValue').textContent = coverage.toFixed(1) + '%';
+        document.getElementById('hoursCount').textContent = timestamps.length.toLocaleString();
+        document.getElementById('avgDcPower').textContent = dcPowerMw;
+
+        // Downsample for chart performance
+        const maxPts = 2000;
+        const dsTimestamps = downsample(timestamps, maxPts);
+        const dsDc = downsample(Array.from(dcValues), maxPts);
+        const dsWnd = downsample(Array.from(projWnd), maxPts);
+        const dsSun = downsample(Array.from(projSun), maxPts);
+        // For stacked area: solar values need to be on top of wind
+        const dsSunStacked = dsSun.map((s, i) => s + dsWnd[i]);
+
+        // Update time chart
+        timeChart.data.labels = dsTimestamps;
+        timeChart.data.datasets[0].data = dsDc;
+        timeChart.data.datasets[1].data = dsWnd;
+        timeChart.data.datasets[2].data = dsSunStacked;
+        timeChart.update();
+
+        // 3D surface chart
+        updateSurfaceChart(filtered, windCap, solarCap);
+    }
+
+    // ---- Init ----
+    function initApp() {
+        const region = document.getElementById('region').value;
+        const r = DATA.regions[region];
+
+        // Find date range from data
+        updateDateBounds();
+
+        // Create charts
+        timeChart = createTimeChart(document.getElementById('timeChart'));
+
+        // Event listeners
+        document.getElementById('region').addEventListener('change', () => {
+            updateDateBounds();
+            updateSliderBounds();
+            surfaceInitialized = false;
+            update();
+        });
+        document.getElementById('startDate').addEventListener('change', update);
+        document.getElementById('endDate').addEventListener('change', update);
+
+        let windTimeout, solarTimeout;
+        document.getElementById('windSlider').addEventListener('input', () => {
+            document.getElementById('windValue').textContent = document.getElementById('windSlider').value + ' MW';
+            clearTimeout(windTimeout);
+            windTimeout = setTimeout(update, 50);
+        });
+        document.getElementById('solarSlider').addEventListener('input', () => {
+            document.getElementById('solarValue').textContent = document.getElementById('solarSlider').value + ' MW';
+            clearTimeout(solarTimeout);
+            solarTimeout = setTimeout(update, 50);
+        });
+
+        updateSliderBounds();
+        update();
+    }
+
+    function updateDateBounds() {
+        const region = document.getElementById('region').value;
+        const r = DATA.regions[region];
+        const allTs = [...r.WND_timestamps, ...r.SUN_timestamps].sort();
+        if (allTs.length === 0) return;
+
+        const firstDate = parseEIATimestamp(allTs[0]);
+        const lastDate = parseEIATimestamp(allTs[allTs.length - 1]);
+        const startEl = document.getElementById('startDate');
+        const endEl = document.getElementById('endDate');
+
+        const fmt = d => d.toISOString().slice(0, 10);
+        startEl.min = fmt(firstDate);
+        startEl.max = fmt(lastDate);
+        endEl.min = fmt(firstDate);
+        endEl.max = fmt(lastDate);
+
+        // Default to Jan 1 - Feb 1 2021 if available, otherwise full range
+        const defaultStart = new Date(Date.UTC(2021, 0, 1));
+        const defaultEnd = new Date(Date.UTC(2021, 1, 1));
+        if (defaultStart >= firstDate && defaultEnd <= lastDate) {
+            startEl.value = '2021-01-01';
+            endEl.value = '2021-02-01';
+        } else {
+            startEl.value = fmt(firstDate);
+            endEl.value = fmt(lastDate);
+        }
+
+        document.getElementById('dateRange').textContent =
+            `Data available: ${fmt(firstDate)} to ${fmt(lastDate)}`;
+    }
+
+    function updateSliderBounds() {
+        const region = document.getElementById('region').value;
+        const r = DATA.regions[region];
+        const windSlider = document.getElementById('windSlider');
+        const solarSlider = document.getElementById('solarSlider');
+
+        // Set max to ~2x the grid max cap (reasonable investment range)
+        const windMax = r.WND_max_cap > 0 ? Math.ceil(r.WND_max_cap * 0.5 / 50) * 50 : 0;
+        const solarMax = r.SUN_max_cap > 0 ? Math.ceil(r.SUN_max_cap * 0.5 / 50) * 50 : 0;
+
+        windSlider.max = Math.max(windMax, 100);
+        solarSlider.max = Math.max(solarMax, 100);
+
+        // Default values matching notebook ba_ppa_map
+        const defaults = {
+            OR: { wind: 500, solar: 0 },
+            NC: { wind: 0, solar: 410 },
+            UT: { wind: 239, solar: 694 },
+        };
+        const def = defaults[region] || { wind: 0, solar: 0 };
+        windSlider.value = Math.min(def.wind, windSlider.max);
+        solarSlider.value = Math.min(def.solar, solarSlider.max);
+
+        // Disable slider if no data for that type
+        windSlider.disabled = r.WND_max_cap === 0;
+        solarSlider.disabled = r.SUN_max_cap === 0;
+    }
+    </script>
+</body>
+</html>

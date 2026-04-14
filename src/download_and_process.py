@@ -10,14 +10,18 @@ import re
 import numpy as np
 from pyarrow import json
 
+# opt in to no‐silent‐downcasting behavior
+pd.set_option("future.no_silent_downcasting", True)
+
+
 # Download EIA's U.S. Electric System Operating Data
 def downloadAndExtract(path):
     url = "https://api.eia.gov/bulk/EBA.zip"
-    
+
     wget.download(url)
-    
+
     # extract the data
-    with zipfile.ZipFile("EBA.zip","r") as zip_ref:
+    with zipfile.ZipFile("EBA.zip", "r") as zip_ref:
         zip_ref.extractall(path)
 
 
@@ -35,11 +39,14 @@ def writeCSV(eba_json):
             r = range(recordsPerFile * i + 1, recordsPerFile * (i + 1))
         print("Writing csv records in {0}".format(r))
         df = eba_json.iloc[r, :]
-        df.to_csv("{0}/EBA_sub_{1}.csv".format(EIA_bulk_data_dir,i))
+        df = df.fillna(method="ffill").infer_objects(copy=False)
+        df.to_csv("{0}/EBA_sub_{1}.csv".format(EIA_bulk_data_dir, i))
+
 
 eba_json = None
 ba_list = []
 ts_list = []
+
 
 def prepareEIAData(EIA_data_path):
     global eba_json
@@ -49,16 +56,18 @@ def prepareEIAData(EIA_data_path):
     # EBA.txt includes time series for power generation from
     # each balancing authority in json format.
     read_options = json.ReadOptions(block_size=2048576)
-    table = json.read_json("{0}/EBA.txt".format(EIA_data_path), read_options=read_options)
+    table = json.read_json(
+        "{0}/EBA.txt".format(EIA_data_path), read_options=read_options
+    )
     eba_json = table.to_pandas()
-    #writeCSV(eba_json)
+    # writeCSV(eba_json)
 
     # Construct list of BAs (ba_list)
     # Construct list of time series (ts_list) using CISO as reference
     #
     series_id_unique = list(eba_json.series_id.unique())
     series_id_unique = list(filter(lambda x: type(x) == str, series_id_unique))
-    
+
     ba_num = 0
     for sid in series_id_unique:
         m = re.search("EBA.(.+?)-", str(sid))
@@ -77,14 +86,14 @@ def prepareEIAData(EIA_data_path):
 
 # Energy types
 ng_list = [
-    "WND", # wind
-    "SUN", # solar
-    "WAT", # hydro
-    "OIL", # oil
+    "WND",  # wind
+    "SUN",  # solar
+    "WAT",  # hydro
+    "OIL",  # oil
     "NG",  # natural gas
-    "COL", # coal
-    "NUC", # nuclear
-    "OTH", # other
+    "COL",  # coal
+    "NUC",  # nuclear
+    "OTH",  # other
 ]
 
 # Renewable energy types
@@ -96,68 +105,88 @@ carbon_intensity = {
     "SUN": 41,
     "WAT": 24,
     "OIL": 650,
-    "NG":  490,
+    "NG": 490,
     "COL": 820,
     "NUC": 12,
     "OTH": 230,
 }
 
+
 # Construct dataframe from json
 # Target specific balancing authority and day
-def extractBARange(ba_idx, start_day, end_day): 
+def extractBARange(ba_idx, start_day, end_day):
     global eba_json
-    start_idx = pd.Timestamp('{0}T00Z'.format(start_day), tz='UTC')
-    end_idx = pd.Timestamp('{0}T00Z'.format(end_day), tz='UTC')
+    start_idx = pd.Timestamp("{0}T00Z".format(start_day), tz="UTC")
+    end_idx = pd.Timestamp("{0}T00Z".format(end_day), tz="UTC")
 
-    idx = pd.date_range(start_day, end_day, freq = "H", tz='UTC')
+    idx = pd.date_range(start_day, end_day, freq="h", tz="UTC")
 
     # Loop over generating assets and append data to ba_list
     #
     ba_list = []
 
     for ng_idx in ng_list:
-        # Target json for specific balancing authority. 
-        # Note .H series means timestamps are in GMT / UTC 
+        # Target json for specific balancing authority.
+        # Note .H series means timestamps are in GMT / UTC
         #
-        series_idx = 'EBA.{0}-ALL.NG.{1}.H'.format(ba_idx, ng_idx)
-        this_json = eba_json[eba_json['series_id'] == series_idx]
+        series_idx = "EBA.{0}-ALL.NG.{1}.H".format(ba_idx, ng_idx)
+        this_json = eba_json[eba_json["series_id"] == series_idx]
         this_json = this_json.reset_index(drop=True)
         if this_json.empty:
-            #print('Dataset does not include {0} data'.format(ng_idx))
-            ba_list.append([0]*(idx.shape[0])) # append a list with zeros
+            # print('Dataset does not include {0} data'.format(ng_idx))
+            ba_list.append([0] * (idx.shape[0]))  # append a list with zeros
             continue
 
         # Check start/end dates for BA's json include target day
         #
-        start_dat = pd.Timestamp(this_json['start'].reset_index(drop=True)[0], tz='UTC')
-        end_dat = pd.Timestamp(this_json['end'].reset_index(drop=True)[0], tz='UTC')
-        if (start_idx < start_dat):
-            print('Indexed start ({0}) precedes {1} dataset range ({2})'.format(start_idx, ng_idx, start_dat))
-            #continue
+        start_dat = pd.Timestamp(this_json["start"].reset_index(drop=True)[0], tz="UTC")
+        end_dat = pd.Timestamp(this_json["end"].reset_index(drop=True)[0], tz="UTC")
+        if start_idx < start_dat:
+            print(
+                "Indexed start ({0}) precedes {1} dataset range ({2})".format(
+                    start_idx, ng_idx, start_dat
+                )
+            )
+            # continue
 
-        if (end_idx > end_dat):
-            print('Indexed end ({0}) beyond {1} dataset range ({2})'.format(end_idx, ng_idx, end_dat))
-            #continue
+        if end_idx > end_dat:
+            print(
+                "Indexed end ({0}) beyond {1} dataset range ({2})".format(
+                    end_idx, ng_idx, end_dat
+                )
+            )
+            # continue
 
         # Extract data tuples for target day
-        # this_json['data'][0] is a list of items x = [date, MWh] tuples 
+        # this_json['data'][0] is a list of items x = [date, MWh] tuples
         #
-        tuple_list = this_json['data'][0]
-        tuple_filtered = list(filter(\
-            lambda x: (pd.Timestamp(x[0], tz='UTC') >= start_idx) & (pd.Timestamp(x[0], tz='UTC') <= end_idx), \
-            tuple_list))
-        df = pd.DataFrame(tuple_filtered, columns =['timestamp', 'power'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-        df = df.sort_values(by=['timestamp'], ascending=(True))
-        df.set_index(pd.DatetimeIndex(df['timestamp']), inplace=True)
-        df.drop(columns=['timestamp'], inplace=True)
+        tuple_list = this_json["data"][0]
+        tuple_filtered = list(
+            filter(
+                lambda x: (pd.Timestamp(x[0], tz="UTC") >= start_idx)
+                & (pd.Timestamp(x[0], tz="UTC") <= end_idx),
+                tuple_list,
+            )
+        )
+        df = pd.DataFrame(tuple_filtered, columns=["timestamp", "power"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+        df = df.sort_values(by=["timestamp"], ascending=(True))
+        df.set_index(pd.DatetimeIndex(df["timestamp"]), inplace=True)
+        df.drop(columns=["timestamp"], inplace=True)
         df = df.reindex(index=idx, fill_value=0).reset_index()
-        ba_list.append(df['power'].tolist())
+        df = df.fillna(0).infer_objects(copy=False)
+        ba_list.append(df["power"].tolist())
 
-    ba_list = pd.to_numeric(ba_list, errors='coerce')
-    dfa = pd.DataFrame(np.array(ba_list).transpose(), columns=ng_list).fillna(0).astype(int)
+    ba_list = pd.to_numeric(ba_list, errors="coerce")
+    dfa = (
+        pd.DataFrame(np.array(ba_list).transpose(), columns=ng_list)
+        .fillna(0)
+        .infer_objects(copy=False)
+        .astype(int)
+    )
     dfa = dfa.set_index(idx)
     return dfa
+
 
 # Calculate carbon intensity of the grid (kg CO2/MWh)
 # Takes a dataframe of energy generation as input (i.e. output of extractBARange)
@@ -168,10 +197,9 @@ def calculateAVGCarbonIntensity(db):
     sum_db = db.sum(axis=1)
     for c in carbon_intensity:
         if tot_carbon is None:
-            tot_carbon = carbon_intensity[c]*db[c]
+            tot_carbon = carbon_intensity[c] * db[c]
         else:
-            tot_carbon = tot_carbon + carbon_intensity[c]*db[c]
+            tot_carbon = tot_carbon + carbon_intensity[c] * db[c]
     tot_carbon = tot_carbon.div(sum_db).to_frame()
     tot_carbon.rename(columns={tot_carbon.columns[0]: "carbon_intensity"}, inplace=True)
     return tot_carbon
-
